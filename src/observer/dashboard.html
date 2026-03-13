@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Walter AI — God Mode</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0d12;
+    --bg2:      #13131c;
+    --bg3:      #1a1a28;
+    --border:   #252535;
+    --green:    #00ff88;
+    --amber:    #ffaa00;
+    --red:      #ff4466;
+    --blue:     #44aaff;
+    --muted:    #555577;
+    --text:     #d0d0e0;
+    --dim:      #888899;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; font-size: 13px; overflow: hidden; }
+
+  /* ── Layout ── */
+  .shell {
+    display: grid;
+    grid-template-rows: 40px 1fr 240px;
+    grid-template-columns: 260px 1fr 260px;
+    grid-template-areas:
+      "header  header  header"
+      "left    center  right"
+      "memory  memory  memory";
+    height: 100vh;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  /* ── Header ── */
+  header {
+    grid-area: header;
+    background: var(--bg2);
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    gap: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo { color: var(--green); font-weight: bold; letter-spacing: 3px; font-size: 14px; }
+  header .sep  { color: var(--border); }
+  header .label { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  header .val   { color: var(--text); margin-left: 4px; }
+  header .status { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .dot.dead { background: var(--red); }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+  header a.logout { color: var(--muted); text-decoration: none; font-size: 11px; margin-left: 1rem; }
+  header a.logout:hover { color: var(--red); }
+
+  /* ── Panels ── */
+  .panel { background: var(--bg2); overflow: hidden; display: flex; flex-direction: column; }
+  .panel-title { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); padding: 8px 12px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+  /* ── Left: Walter State ── */
+  #left { grid-area: left; }
+  .state-block { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .state-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .state-row:last-child { margin-bottom: 0; }
+  .state-key { color: var(--dim); font-size: 11px; }
+  .state-val { color: var(--text); }
+  .bar-wrap { flex: 1; margin: 0 8px; height: 4px; background: var(--bg3); border-radius: 2px; }
+  .bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+  .trait-row { display: flex; align-items: center; margin-bottom: 5px; gap: 6px; }
+  .trait-name { color: var(--dim); font-size: 11px; width: 80px; flex-shrink: 0; }
+  .trait-bar-wrap { flex: 1; height: 3px; background: var(--bg3); border-radius: 2px; }
+  .trait-bar-fill { height: 100%; border-radius: 2px; background: var(--blue); transition: width 0.4s ease; }
+  .trait-val { color: var(--dim); font-size: 10px; width: 28px; text-align: right; }
+
+  .anomaly-box { padding: 10px 12px; text-align: center; }
+  .anomaly-count { font-size: 36px; color: var(--red); font-weight: bold; line-height: 1; }
+  .anomaly-count.zero { color: var(--muted); font-size: 28px; }
+  .anomaly-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
+
+  /* ── Center: Tick Log ── */
+  #center { grid-area: center; }
+  #tickLog { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .tick-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    padding: 8px 10px;
+    flex-shrink: 0;
+  }
+  .tick-card.action-think       { border-left-color: var(--blue); }
+  .tick-card.action-journal      { border-left-color: var(--amber); }
+  .tick-card.action-work_startup { border-left-color: var(--green); }
+  .tick-card.action-sleep        { border-left-color: var(--muted); }
+  .tick-card.action-post_x       { border-left-color: #aa88ff; }
+  .tick-card.action-read_x       { border-left-color: #44ccff; }
+  .tick-card.action-reply_x      { border-left-color: #ff88aa; }
+
+  .tick-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .action-badge {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    padding: 1px 6px; border-radius: 2px; background: var(--bg2); color: var(--dim);
+    border: 1px solid var(--border);
+  }
+  .tick-time { color: var(--muted); font-size: 10px; }
+  .mood-delta { font-size: 10px; margin-left: auto; }
+  .mood-delta.pos { color: var(--green); }
+  .mood-delta.neg { color: var(--red); }
+  .mood-delta.neu { color: var(--dim); }
+  .tick-content { color: var(--text); margin-bottom: 4px; line-height: 1.4; }
+  .tick-inner { color: var(--dim); font-size: 11px; font-style: italic; }
+
+  /* ── Right: God Mode ── */
+  #right { grid-area: right; overflow-y: auto; }
+  .god-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .god-section h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 8px; }
+  textarea, input[type=text], input[type=number], select {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text); font-family: monospace; font-size: 12px;
+    padding: 6px 8px; resize: vertical;
+  }
+  textarea:focus, input:focus, select:focus { outline: none; border-color: var(--green); }
+  .god-btn {
+    margin-top: 6px; width: 100%; padding: 6px; background: transparent;
+    border: 1px solid var(--border); color: var(--dim); font-family: monospace;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .god-btn:hover { border-color: var(--green); color: var(--green); }
+  .god-btn.danger:hover { border-color: var(--red); color: var(--red); }
+  .god-btn.amber:hover { border-color: var(--amber); color: var(--amber); }
+  .god-msg { font-size: 10px; margin-top: 4px; height: 14px; color: var(--green); }
+  .god-msg.err { color: var(--red); }
+
+  .trait-select-row { display: flex; gap: 6px; margin-top: 6px; }
+  .trait-select-row select { flex: 1; }
+  .trait-select-row input { width: 60px; flex-shrink: 0; }
+
+  /* ── Bottom: Memory Browser ── */
+  #memory { grid-area: memory; background: var(--bg2); display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+  .mem-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .mem-tab {
+    padding: 6px 14px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--dim); cursor: pointer; border-right: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+  .mem-tab:hover { color: var(--text); }
+  .mem-tab.active { color: var(--green); background: var(--bg3); border-bottom: 2px solid var(--green); }
+  .mem-content { flex: 1; overflow-y: auto; padding: 8px; }
+  .mem-empty { color: var(--muted); font-size: 11px; padding: 8px; }
+
+  .mem-entry {
+    background: var(--bg3); border: 1px solid var(--border);
+    padding: 6px 10px; margin-bottom: 4px; line-height: 1.4;
+  }
+  .mem-entry-meta { color: var(--muted); font-size: 10px; margin-bottom: 3px; display: flex; gap: 10px; }
+  .mem-entry-content { color: var(--text); }
+  .mem-entry-sub { color: var(--dim); font-size: 11px; font-style: italic; margin-top: 2px; }
+
+  .personality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+  .p-card { background: var(--bg3); border: 1px solid var(--border); padding: 8px 10px; }
+  .p-card-name { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 6px; }
+  .p-card-val { font-size: 24px; color: var(--text); }
+  .p-bar { height: 3px; background: var(--bg2); border-radius: 2px; margin-top: 6px; }
+  .p-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Header -->
+  <header>
+    <span class="logo">WALTER AI v2</span>
+    <span class="sep">|</span>
+    <span class="label">TICK</span><span class="val" id="hTick">—</span>
+    <span class="sep">|</span>
+    <span class="label">DAY</span><span class="val" id="hDay">—</span>
+    <span class="sep">|</span>
+    <span class="label">HOUR</span><span class="val" id="hHour">—</span>
+    <span class="sep">|</span>
+    <span class="label">MOOD</span><span class="val" id="hMood">—</span>
+    <span class="status">
+      <div class="dot" id="connDot"></div>
+      <span id="connLabel">connecting...</span>
+    </span>
+    <a href="/logout" class="logout">logout</a>
+  </header>
+
+  <!-- Left: Walter State -->
+  <div class="panel" id="left">
+    <div class="panel-title">Walter's State</div>
+
+    <div class="state-block">
+      <div class="state-row">
+        <span class="state-key">Mood</span>
+        <div class="bar-wrap"><div class="bar-fill" id="moodBar" style="width:55%;background:var(--green)"></div></div>
+        <span class="state-val" id="moodVal">0.10</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">Energy</span>
+        <div class="bar-wrap"><div class="bar-fill" id="energyBar" style="width:60%;background:var(--blue)"></div></div>
+        <span class="state-val" id="energyVal">0.60</span>
+      </div>
+      <div class="state-row">
+        <span class="state-key">Last action</span>
+        <span class="state-val" id="lastAction">—</span>
+      </div>
+    </div>
+
+    <div class="state-block">
+      <div class="panel-title" style="padding:0 0 6px; border:none;">Personality</div>
+      <div class="trait-row">
+        <span class="trait-name">Ambition</span>
+        <div class="trait-bar-wrap"><div class="trait-bar-fill" id="pAmbition" style="width:80%"></div></div>
+        <span class="trait-val" id="pAmbitionVal">80%</span>
+      </div>
+      <div class="trait-row">
+        <span class="trait-name">Anxiety</span>
+        <div class="trait-bar-wrap"><div class="trait-bar-fill" id="pAnxiety" style="width:65%;background:var(--amber)"></div></div>
+        <span class="trait-val" id="pAnxietyVal">65%</span>
+      </div>
+      <div class="trait-row">
+        <span class="trait-name">Social need</span>
+        <div class="trait-bar-wrap"><div class="trait-bar-fill" id="pSocialNeed" style="width:50%"></div></div>
+        <span class="trait-val" id="pSocialNeedVal">50%</span>
+      </div>
+      <div class="trait-row">
+        <span class="trait-name">Openness</span>
+        <div class="trait-bar-wrap"><div class="trait-bar-fill" id="pOpenness" style="width:50%"></div></div>
+        <span class="trait-val" id="pOpennessVal">50%</span>
+      </div>
+      <div class="trait-row">
+        <span class="trait-name">Humor</span>
+        <div class="trait-bar-wrap"><div class="trait-bar-fill" id="pHumor" style="width:70%;background:var(--amber)"></div></div>
+        <span class="trait-val" id="pHumorVal">70%</span>
+      </div>
+    </div>
+
+    <div class="anomaly-box">
+      <div class="anomaly-count zero" id="anomalyCount">0</div>
+      <div class="anomaly-label">Anomalies Detected</div>
+    </div>
+  </div>
+
+  <!-- Center: Live Tick Log -->
+  <div class="panel" id="center">
+    <div class="panel-title">Live Tick Log</div>
+    <div id="tickLog"></div>
+  </div>
+
+  <!-- Right: God Mode -->
+  <div class="panel" id="right">
+    <div class="panel-title">God Mode</div>
+
+    <div class="god-section">
+      <h3>Plant a Thought</h3>
+      <textarea id="thoughtInput" rows="3" placeholder="A thought Walter will believe is his own..."></textarea>
+      <button class="god-btn" onclick="plantThought()">Inject Thought</button>
+      <div class="god-msg" id="thoughtMsg"></div>
+    </div>
+
+    <div class="god-section">
+      <h3>Create an Event</h3>
+      <textarea id="eventInput" rows="2" placeholder="Something happens to Walter..."></textarea>
+      <button class="god-btn amber" onclick="createEvent()">Trigger Event</button>
+      <div class="god-msg" id="eventMsg"></div>
+    </div>
+
+    <div class="god-section">
+      <h3>Trigger Glitch</h3>
+      <textarea id="glitchInput" rows="2" placeholder="An unexplainable anomaly..."></textarea>
+      <button class="god-btn danger" onclick="triggerGlitch()">Trigger Glitch</button>
+      <div class="god-msg" id="glitchMsg"></div>
+    </div>
+
+    <div class="god-section">
+      <h3>Adjust Trait</h3>
+      <div class="trait-select-row">
+        <select id="traitSelect">
+          <option value="ambition">ambition</option>
+          <option value="anxiety">anxiety</option>
+          <option value="socialNeed">social need</option>
+          <option value="openness">openness</option>
+          <option value="humor">humor</option>
+        </select>
+        <input type="number" id="traitVal" min="0" max="1" step="0.05" value="0.5" />
+      </div>
+      <button class="god-btn" onclick="adjustTrait()">Apply</button>
+      <div class="god-msg" id="traitMsg"></div>
+    </div>
+  </div>
+
+  <!-- Bottom: Memory Browser -->
+  <div id="memory">
+    <div class="mem-tabs">
+      <div class="mem-tab active" onclick="switchTab('short-term', this)">Short-term</div>
+      <div class="mem-tab" onclick="switchTab('long-term', this)">Long-term</div>
+      <div class="mem-tab" onclick="switchTab('journal', this)">Journal</div>
+      <div class="mem-tab" onclick="switchTab('relationships', this)">Relationships</div>
+      <div class="mem-tab" onclick="switchTab('personality', this)">Personality</div>
+      <div class="mem-tab" onclick="switchTab('anomalies', this)">Anomalies</div>
+    </div>
+    <div class="mem-content" id="memContent">
+      <div class="mem-empty">Connecting to Walter...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// WebSocket
+// ---------------------------------------------------------------------------
+let ws;
+let currentTab = 'short-term';
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+
+  ws.onopen = () => {
+    document.getElementById('connDot').className = 'dot live';
+    document.getElementById('connLabel').textContent = 'live';
+  };
+
+  ws.onclose = () => {
+    document.getElementById('connDot').className = 'dot dead';
+    document.getElementById('connLabel').textContent = 'disconnected';
+    setTimeout(connect, 3000); // auto-reconnect
+  };
+
+  ws.onerror = () => {
+    document.getElementById('connDot').className = 'dot dead';
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    switch (msg.type) {
+      case 'connected':
+        updateState(msg.state, msg.personality, msg.anomalyCount);
+        if (msg.recentMemories) refreshMemTab(currentTab);
+        break;
+      case 'tick_update':
+        updateState(msg.state, msg.personality, msg.anomalyCount);
+        appendTickCard(msg.decision, msg.state, msg.timestamp);
+        refreshMemTab(currentTab);
+        break;
+      case 'god_action':
+        // Visual feedback — a flash or log
+        break;
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// State updates
+// ---------------------------------------------------------------------------
+
+function updateState(state, personality, anomalyCount) {
+  if (!state) return;
+
+  // Header
+  if (state.tickCount !== undefined) document.getElementById('hTick').textContent = '#' + state.tickCount;
+  if (state.day !== undefined) document.getElementById('hDay').textContent = state.day;
+  if (state.hour !== undefined) document.getElementById('hHour').textContent = state.hour.toFixed(1);
+
+  const mood = state.mood || 0;
+  const energy = state.energy || 0;
+  document.getElementById('hMood').textContent = mood.toFixed(2);
+  document.getElementById('moodVal').textContent = mood.toFixed(2);
+  document.getElementById('energyVal').textContent = energy.toFixed(2);
+
+  const moodPct = ((mood + 1) / 2 * 100).toFixed(0) + '%';
+  const moodColor = mood >= 0.2 ? 'var(--green)' : mood >= -0.2 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('moodBar').style.width = moodPct;
+  document.getElementById('moodBar').style.background = moodColor;
+  document.getElementById('energyBar').style.width = (energy * 100).toFixed(0) + '%';
+
+  if (state.lastAction) document.getElementById('lastAction').textContent = state.lastAction;
+
+  if (personality) updatePersonality(personality);
+
+  if (anomalyCount !== undefined) {
+    const el = document.getElementById('anomalyCount');
+    el.textContent = anomalyCount;
+    el.className = 'anomaly-count' + (anomalyCount > 0 ? '' : ' zero');
+  }
+}
+
+function updatePersonality(p) {
+  setTrait('Ambition', p.ambition, 'var(--green)');
+  setTrait('Anxiety', p.anxiety, 'var(--red)');
+  setTrait('SocialNeed', p.socialNeed, 'var(--blue)');
+  setTrait('Openness', p.openness, 'var(--blue)');
+  setTrait('Humor', p.humor, 'var(--amber)');
+}
+
+function setTrait(name, val, color) {
+  const bar = document.getElementById('p' + name);
+  const label = document.getElementById('p' + name + 'Val');
+  if (bar) { bar.style.width = (val * 100).toFixed(0) + '%'; bar.style.background = color; }
+  if (label) label.textContent = (val * 100).toFixed(0) + '%';
+}
+
+// ---------------------------------------------------------------------------
+// Tick cards
+// ---------------------------------------------------------------------------
+
+function appendTickCard(decision, state, timestamp) {
+  if (!decision) return;
+
+  const log = document.getElementById('tickLog');
+  const moodChange = decision.moodChange || 0;
+  const moodClass = moodChange > 0.01 ? 'pos' : moodChange < -0.01 ? 'neg' : 'neu';
+  const moodSign = moodChange > 0 ? '+' : '';
+
+  const card = document.createElement('div');
+  card.className = `tick-card action-${decision.action}`;
+  card.innerHTML = `
+    <div class="tick-meta">
+      <span class="action-badge">${decision.action}</span>
+      <span class="tick-time">${formatTime(timestamp)}</span>
+      <span class="mood-delta ${moodClass}">${moodSign}${moodChange.toFixed(2)}</span>
+    </div>
+    <div class="tick-content">${esc(decision.content || '')}</div>
+    ${decision.innerThought ? `<div class="tick-inner">"${esc(decision.innerThought)}"</div>` : ''}
+  `;
+  log.appendChild(card);
+  log.scrollTop = log.scrollHeight;
+
+  // Keep log from growing forever in the browser
+  while (log.children.length > 100) log.removeChild(log.firstChild);
+}
+
+// ---------------------------------------------------------------------------
+// Memory browser
+// ---------------------------------------------------------------------------
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.mem-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentTab = tab;
+  refreshMemTab(tab);
+}
+
+async function refreshMemTab(tab) {
+  const content = document.getElementById('memContent');
+
+  try {
+    let data;
+    if (tab === 'journal') {
+      data = await apiFetch('/journal');
+      renderJournal(data, content);
+    } else if (tab === 'personality') {
+      data = await apiFetch('/personality');
+      renderPersonality(data, content);
+    } else {
+      data = await apiFetch('/memory/' + tab);
+      renderMemoryList(data, tab, content);
+    }
+  } catch (err) {
+    content.innerHTML = `<div class="mem-empty">Error loading: ${err.message}</div>`;
+  }
+}
+
+function renderMemoryList(entries, tab, container) {
+  if (!entries || entries.length === 0) {
+    container.innerHTML = '<div class="mem-empty">No entries yet.</div>';
+    return;
+  }
+
+  const reversed = [...entries].reverse();
+  container.innerHTML = reversed.map(e => {
+    const meta = [
+      e.timestamp ? shortTs(e.timestamp) : '',
+      e.action || e.type || '',
+      e.importance ? `importance: ${e.importance.toFixed(2)}` : '',
+      e.interaction_count ? `${e.interaction_count} interactions` : '',
+    ].filter(Boolean).join(' · ');
+
+    const content = e.content || e.summary || e.description || e.thought || (e.handle ? `@${e.handle}` : '') || JSON.stringify(e);
+    const sub = e.innerThought || e.notes || (e.sentiment !== undefined ? `sentiment: ${e.sentiment}` : '');
+
+    return `<div class="mem-entry">
+      <div class="mem-entry-meta">${esc(meta)}</div>
+      <div class="mem-entry-content">${esc(content)}</div>
+      ${sub ? `<div class="mem-entry-sub">${esc(sub)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderJournal(entries, container) {
+  if (!entries || entries.length === 0) {
+    container.innerHTML = '<div class="mem-empty">Walter hasn\'t written anything yet.</div>';
+    return;
+  }
+
+  const reversed = [...entries].reverse();
+  container.innerHTML = reversed.map(e => `
+    <div class="mem-entry" style="border-left-color:var(--amber)">
+      <div class="mem-entry-meta">${esc(shortTs(e.timestamp))} · Day ${e.day || '?'}, Hour ${e.hour ? parseFloat(e.hour).toFixed(1) : '?'} · mood ${e.mood ? e.mood.toFixed(2) : '?'}</div>
+      <div class="mem-entry-content">${esc(e.content || '')}</div>
+      ${e.innerThought ? `<div class="mem-entry-sub">"${esc(e.innerThought)}"</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderPersonality(p, container) {
+  if (!p) { container.innerHTML = '<div class="mem-empty">No personality data.</div>'; return; }
+  const traits = [
+    { name: 'Ambition', key: 'ambition', color: 'var(--green)' },
+    { name: 'Anxiety', key: 'anxiety', color: 'var(--red)' },
+    { name: 'Social Need', key: 'socialNeed', color: 'var(--blue)' },
+    { name: 'Openness', key: 'openness', color: 'var(--blue)' },
+    { name: 'Humor', key: 'humor', color: 'var(--amber)' },
+  ];
+  container.innerHTML = `<div class="personality-grid">${traits.map(t => `
+    <div class="p-card">
+      <div class="p-card-name">${t.name}</div>
+      <div class="p-card-val">${((p[t.key] || 0) * 100).toFixed(0)}%</div>
+      <div class="p-bar"><div class="p-bar-fill" style="width:${((p[t.key]||0)*100).toFixed(0)}%;background:${t.color}"></div></div>
+    </div>
+  `).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// God mode actions
+// ---------------------------------------------------------------------------
+
+async function plantThought() {
+  const thought = document.getElementById('thoughtInput').value.trim();
+  if (!thought) return;
+  await godPost('/god/thought', { thought }, 'thoughtMsg', 'thoughtInput');
+}
+
+async function createEvent() {
+  const event = document.getElementById('eventInput').value.trim();
+  if (!event) return;
+  await godPost('/god/event', { event }, 'eventMsg', 'eventInput');
+}
+
+async function triggerGlitch() {
+  const description = document.getElementById('glitchInput').value.trim();
+  if (!description) return;
+  await godPost('/god/glitch', { description }, 'glitchMsg', 'glitchInput');
+}
+
+async function adjustTrait() {
+  const trait = document.getElementById('traitSelect').value;
+  const value = parseFloat(document.getElementById('traitVal').value);
+  if (isNaN(value)) return;
+  await godPost('/god/trait', { trait, value }, 'traitMsg');
+}
+
+async function godPost(url, body, msgId, clearId) {
+  const msgEl = document.getElementById(msgId);
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      msgEl.className = 'god-msg';
+      msgEl.textContent = data.message || 'Done.';
+      if (clearId) document.getElementById(clearId).value = '';
+    } else {
+      msgEl.className = 'god-msg err';
+      msgEl.textContent = data.error || 'Error.';
+    }
+  } catch (err) {
+    msgEl.className = 'god-msg err';
+    msgEl.textContent = err.message;
+  }
+  setTimeout(() => { msgEl.textContent = ''; }, 3000);
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+async function apiFetch(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function shortTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+connect();
+refreshMemTab('short-term');
+</script>
+</body>
+</html>
