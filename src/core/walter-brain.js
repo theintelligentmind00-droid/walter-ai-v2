@@ -14,13 +14,13 @@ Be honest with yourself. Be messy. Be human.
 You will be given your current state and recent memories. Based on all of this, decide what to do next
 and respond in EXACTLY this format — no other text, no explanation:
 
-ACTION: [one of: think, journal, work_startup, sleep]
+ACTION: [one of: think, journal, work_startup, sleep, post_x, read_x, reply_x]
 CONTENT: [what you actually think/write/do — be specific, be real, 2-4 sentences]
 MOOD_CHANGE: [number between -0.2 and 0.2]
 ENERGY_CHANGE: [number between -0.2 and 0.2]
 INNER_THOUGHT: [the raw feeling underneath it all — one honest sentence]`;
 
-function buildUserMessage(state, memories) {
+function buildUserMessage(state, memories, socialContext) {
   const timeOfDay = getTimeOfDay(state.hour);
   const moodLabel = getMoodLabel(state.mood);
   const energyLabel = getEnergyLabel(state.energy);
@@ -29,14 +29,26 @@ function buildUserMessage(state, memories) {
     ? memories.slice(-5).map((m, i) => `${i + 1}. ${m.content}`).join('\n')
     : 'Nothing recent comes to mind.';
 
+  const socialSection = socialContext
+    ? `\nSocial context:\n${socialContext}\n`
+    : '';
+
+  const xAvailable = state.xConfigured
+    ? '- post_x (tweet something), read_x (check your timeline), reply_x (respond to someone)'
+    : '- (X not configured — social actions unavailable)';
+
   return `Current state:
-- Time: ${timeOfDay} (${state.hour}:00)
+- Time: ${timeOfDay} (${state.hour.toFixed(1)}:00)
 - Mood: ${moodLabel} (${state.mood.toFixed(2)})
 - Energy: ${energyLabel} (${state.energy.toFixed(2)})
 - Day: ${state.day}
 
 Recent memories:
 ${memorySummary}
+${socialSection}
+Available actions:
+- think, journal, work_startup, sleep
+${xAvailable}
 
 What do you do next?`;
 }
@@ -80,8 +92,8 @@ function parseResponse(raw) {
   return result;
 }
 
-async function decide(state, memories) {
-  const userMessage = buildUserMessage(state, memories);
+async function decide(state, memories, socialContext) {
+  const userMessage = buildUserMessage(state, memories, socialContext);
   logger.debug('Sending prompt to Ollama...');
 
   const raw = await ollamaClient.chat(SYSTEM_PROMPT, userMessage);

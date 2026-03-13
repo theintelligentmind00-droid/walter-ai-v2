@@ -6,7 +6,9 @@ const logger = require('../utils/logger');
 const MEMORY_DIR = config.paths.memory;
 const SHORT_TERM_FILE = path.join(MEMORY_DIR, 'short-term.json');
 const STATE_FILE = path.join(MEMORY_DIR, 'state.json');
+const SOCIAL_FILE = path.join(MEMORY_DIR, 'social-interactions.json');
 const MAX_SHORT_TERM = 20;
+const MAX_SOCIAL = 50;
 
 const DEFAULT_STATE = {
   mood: 0.1,       // slightly anxious baseline
@@ -77,10 +79,34 @@ function getRecentMemories(count = 5) {
   return memories.slice(-count);
 }
 
+function addSocialInteraction(entry) {
+  ensureMemoryDir();
+  const interactions = readJSON(SOCIAL_FILE, []);
+
+  interactions.push({
+    timestamp: new Date().toISOString(),
+    ...entry,
+  });
+
+  if (interactions.length > MAX_SOCIAL) {
+    interactions.splice(0, interactions.length - MAX_SOCIAL);
+  }
+
+  atomicWrite(SOCIAL_FILE, interactions);
+  logger.debug(`Social interaction saved: [${entry.type}]`);
+}
+
+function getRecentSocialInteractions(count = 5) {
+  const interactions = readJSON(SOCIAL_FILE, []);
+  return interactions.slice(-count);
+}
+
 module.exports = {
   loadState,
   saveState,
   addMemory,
   getRecentMemories,
   loadShortTerm,
+  addSocialInteraction,
+  getRecentSocialInteractions,
 };
