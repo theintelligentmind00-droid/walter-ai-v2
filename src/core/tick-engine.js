@@ -271,6 +271,10 @@ async function runTick() {
   state.mood = clamp(state.mood + decision.moodChange, -1, 1);
   state.energy = clamp(state.energy + decision.energyChange, 0, 1);
 
+  // Natural recovery — humans stabilize, they don't freefall forever
+  if (state.mood < -0.3) state.mood = clamp(state.mood + 0.02, -1, 1);
+  if (state.energy < 0.2) state.energy = clamp(state.energy + 0.03, 0, 1);
+
   logger.tick(`Mood: ${moodBefore.toFixed(2)} → ${state.mood.toFixed(2)} | Energy: ${state.energy.toFixed(2)}`);
 
   // Personality evolution

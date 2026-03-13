@@ -119,7 +119,7 @@ function parseResponse(raw) {
         result.action = value.toLowerCase();
         break;
       case 'CONTENT':
-        result.content = value;
+        result.content = stripHashtags(value);
         break;
       case 'MOOD_CHANGE':
         result.moodChange = clamp(parseFloat(value) || 0, -0.2, 0.2);
@@ -128,7 +128,7 @@ function parseResponse(raw) {
         result.energyChange = clamp(parseFloat(value) || 0, -0.2, 0.2);
         break;
       case 'INNER_THOUGHT':
-        result.innerThought = value;
+        result.innerThought = stripHashtags(value);
         break;
     }
   }
@@ -174,6 +174,10 @@ function getEnergyLabel(energy) {
 
 function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
+}
+
+function stripHashtags(text) {
+  return text.replace(/#\w+/g, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 module.exports = { decide };

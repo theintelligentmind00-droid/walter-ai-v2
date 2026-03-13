@@ -3,6 +3,10 @@ const logger = require('../utils/logger');
 
 function clamp(val, min, max) { return Math.min(Math.max(val, min), max); }
 
+function stripHashtags(text) {
+  return text.replace(/#\w+/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 function get(raw, key) {
   const match = raw.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
   return match ? match[1].trim() : '';
@@ -13,7 +17,7 @@ const GO_OUT_SYSTEM = `You are narrating a moment in Walter's life. Walter is 24
 Based on his mood and the time of day, narrate what happens. Use EXACTLY this format — no other text:
 
 LOCATION: [specific named place — e.g. "a coffee shop called Blue Bottle on 3rd", "a coworking space downtown", "a bar called The Rail two blocks away", "the roof of his building"]
-MET_SOMEONE: [yes or no — roughly 40% chance of yes]
+MET_SOMEONE: [yes or no — roughly 65% chance of yes — he's a 24 year old going to coffee shops and bars, he talks to people]
 SUMMARY: [2-3 sentences from Walter's first-person perspective: where he went, what he did, how it felt]
 MOOD_IMPACT: [number from -0.15 to 0.15]
 ENERGY_IMPACT: [number from -0.1 to 0.1]
@@ -59,13 +63,13 @@ async function goOut(state) {
   return {
     location: get(raw, 'LOCATION') || 'somewhere nearby',
     metSomeone: metSomeone && !!personName,
-    summary: get(raw, 'SUMMARY') || raw.trim(),
+    summary: stripHashtags(get(raw, 'SUMMARY') || raw.trim()),
     moodImpact: clamp(parseFloat(get(raw, 'MOOD_IMPACT')) || 0, -0.15, 0.15),
     energyImpact: clamp(parseFloat(get(raw, 'ENERGY_IMPACT')) || 0, -0.1, 0.1),
     person: metSomeone && personName ? {
       name: personName,
-      vibe: get(raw, 'PERSON_VIBE') || '',
-      said: get(raw, 'PERSON_SAID') || '',
+      vibe: stripHashtags(get(raw, 'PERSON_VIBE') || ''),
+      said: stripHashtags(get(raw, 'PERSON_SAID') || ''),
     } : null,
   };
 }
@@ -97,8 +101,8 @@ Generate the exchange.`;
   }
 
   return {
-    walterMessage: get(raw, 'WALTER_SAYS') || 'hey',
-    response: get(raw, 'THEIR_RESPONSE') || '...',
+    walterMessage: stripHashtags(get(raw, 'WALTER_SAYS') || 'hey'),
+    response: stripHashtags(get(raw, 'THEIR_RESPONSE') || '...'),
     moodImpact: clamp(parseFloat(get(raw, 'MOOD_IMPACT')) || 0, -0.1, 0.1),
   };
 }

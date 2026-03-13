@@ -289,7 +289,7 @@
     <div class="god-section">
       <h3>Create an Event</h3>
       <textarea id="eventInput" rows="2" placeholder="Something happens to Walter..."></textarea>
-      <button class="god-btn amber" onclick="createEvent()">Trigger Event</button>
+      <button class="god-btn amber" onclick="godCreateEvent()">Trigger Event</button>
       <div class="god-msg" id="eventMsg"></div>
     </div>
 
@@ -374,7 +374,14 @@ function connect() {
         refreshMemTab(currentTab);
         break;
       case 'god_action':
-        // Visual feedback — a flash or log
+        if (msg.type === 'trait_adjusted' && msg.personality) {
+          updatePersonality(msg.personality);
+        }
+        if (msg.anomalyCount !== undefined) {
+          const el = document.getElementById('anomalyCount');
+          el.textContent = msg.anomalyCount;
+          el.className = 'anomaly-count' + (msg.anomalyCount > 0 ? '' : ' zero');
+        }
         break;
     }
   };
@@ -573,23 +580,30 @@ async function plantThought() {
   await godPost('/god/thought', { thought }, 'thoughtMsg', 'thoughtInput');
 }
 
-async function createEvent() {
+async function godCreateEvent() {
   const event = document.getElementById('eventInput').value.trim();
-  if (!event) return;
+  if (!event) { showMsg('eventMsg', 'Enter an event description first.', true); return; }
   await godPost('/god/event', { event }, 'eventMsg', 'eventInput');
 }
 
 async function triggerGlitch() {
   const description = document.getElementById('glitchInput').value.trim();
-  if (!description) return;
+  if (!description) { showMsg('glitchMsg', 'Enter a glitch description first.', true); return; }
   await godPost('/god/glitch', { description }, 'glitchMsg', 'glitchInput');
 }
 
 async function adjustTrait() {
   const trait = document.getElementById('traitSelect').value;
   const value = parseFloat(document.getElementById('traitVal').value);
-  if (isNaN(value)) return;
+  if (isNaN(value) || value < 0 || value > 1) { showMsg('traitMsg', 'Value must be between 0 and 1.', true); return; }
   await godPost('/god/trait', { trait, value }, 'traitMsg');
+}
+
+function showMsg(msgId, text, isError) {
+  const el = document.getElementById(msgId);
+  el.className = 'god-msg' + (isError ? ' err' : '');
+  el.textContent = text;
+  setTimeout(() => { el.textContent = ''; }, 3000);
 }
 
 async function godPost(url, body, msgId, clearId) {

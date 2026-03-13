@@ -16,6 +16,10 @@ You reply like a real person — casual, honest, occasionally funny. Short repli
 If you have nothing genuine to say, output exactly: SKIP
 Otherwise output ONLY the reply text — nothing else.`;
 
+function stripHashtags(text) {
+  return text.replace(/#\w+/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 async function composeTweet(state, recentMemories) {
   const moodLabel = getMoodLabel(state.mood);
   const timeOfDay = getTimeOfDay(state.hour);
@@ -32,7 +36,7 @@ What do you tweet?`;
 
   logger.debug('Composing tweet via Ollama...');
   const raw = await ollamaClient.chat(TWEET_SYSTEM_PROMPT, userMessage);
-  const tweet = raw.trim().replace(/^["']|["']$/g, ''); // Strip surrounding quotes if LLM adds them
+  const tweet = stripHashtags(raw.trim().replace(/^["']|["']$/g, ''));
 
   // Hard enforce 280 char limit
   return tweet.slice(0, 280);
@@ -51,7 +55,7 @@ How do you respond? (or SKIP if you have nothing genuine to say)`;
   const reply = raw.trim().replace(/^["']|["']$/g, '');
 
   if (reply.toUpperCase() === 'SKIP') return null;
-  return reply.slice(0, 280);
+  return stripHashtags(reply).slice(0, 280);
 }
 
 function getMoodLabel(mood) {

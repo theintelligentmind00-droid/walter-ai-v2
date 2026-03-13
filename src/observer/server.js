@@ -185,7 +185,7 @@ app.post('/god/event', (req, res) => {
     memoryManager.addPlantedThought(`Something just happened: ${event.trim()}`, { source: 'god_event', event });
     memoryManager.addAnomaly({ type: 'god_event', description: event });
     logger.info(`[GOD MODE] Event created: "${event.slice(0, 60)}"`);
-    broadcast('god_action', { type: 'event_created', event });
+    broadcast('god_action', { type: 'event_created', event, anomalyCount: memoryManager.getAnomalyCount() });
     res.json({ ok: true, message: 'Event injected.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -201,7 +201,7 @@ app.post('/god/glitch', (req, res) => {
     memoryManager.addPlantedThought(glitchThought, { source: 'god_glitch' });
     memoryManager.addAnomaly({ type: 'glitch', description, walterAware: true });
     logger.info(`[GOD MODE] Glitch triggered: "${description.slice(0, 60)}"`);
-    broadcast('god_action', { type: 'glitch_triggered', description });
+    broadcast('god_action', { type: 'glitch_triggered', description, anomalyCount: memoryManager.getAnomalyCount() });
     res.json({ ok: true, message: 'Glitch triggered.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -220,7 +220,7 @@ app.post('/god/trait', (req, res) => {
     personality[trait] = num;
     memoryManager.savePersonality(personality);
     logger.info(`[GOD MODE] Trait adjusted: ${trait} → ${num}`);
-    broadcast('god_action', { type: 'trait_adjusted', trait, value: num });
+    broadcast('god_action', { type: 'trait_adjusted', trait, value: num, personality });
     res.json({ ok: true, personality });
   } catch (err) {
     res.status(500).json({ error: err.message });
