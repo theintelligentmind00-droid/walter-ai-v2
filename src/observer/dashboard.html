@@ -185,6 +185,8 @@
   .p-bar { height: 3px; background: var(--bg2); border-radius: 2px; margin-top: 6px; }
   .p-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
 
+  .tick-micro { color: var(--muted); font-size: 10px; font-style: italic; padding: 3px 0 5px 8px; border-left: 2px solid var(--border); margin-bottom: 4px; }
+
   /* scrollbars */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -370,7 +372,7 @@ function connect() {
         break;
       case 'tick_update':
         updateState(msg.state, msg.personality, msg.anomalyCount);
-        appendTickCard(msg.decision, msg.state, msg.timestamp);
+        appendTickCard(msg.decision, msg.state, msg.timestamp, msg.microAction);
         refreshMemTab(currentTab);
         break;
       case 'god_action':
@@ -441,7 +443,7 @@ function setTrait(name, val, color) {
 // Tick cards
 // ---------------------------------------------------------------------------
 
-function appendTickCard(decision, state, timestamp) {
+function appendTickCard(decision, state, timestamp, microAction) {
   if (!decision) return;
 
   const log = document.getElementById('tickLog');
@@ -452,6 +454,7 @@ function appendTickCard(decision, state, timestamp) {
   const card = document.createElement('div');
   card.className = `tick-card action-${decision.action}`;
   card.innerHTML = `
+    ${microAction ? `<div class="tick-micro">${esc(microAction)}</div>` : ''}
     <div class="tick-meta">
       <span class="action-badge">${decision.action}</span>
       <span class="tick-time">${formatTime(timestamp)}</span>

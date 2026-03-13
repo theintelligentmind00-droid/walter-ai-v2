@@ -12,6 +12,34 @@ const messageStore = require('../social/message-store');
 
 let onTickCallback = null; // Set by index.js to wire dashboard updates
 
+// Micro-actions — small human things Walter does before each main action
+const MICRO_ACTIONS = [
+  'Checked his phone before getting out of bed.',
+  'Made coffee. Stood in the kitchen waiting for it.',
+  'Opened the fridge. Closed it. Nothing changed.',
+  'Stretched. Cracked his knuckles.',
+  'Stared out the window at nothing in particular.',
+  'Put music on. Spent two minutes deciding what. Ended up on shuffle.',
+  'Opened his laptop. Watched it wake up.',
+  'Washed one dish. Left the rest.',
+  'Microwaved leftovers. Ate them standing at the counter.',
+  'Scrolled his phone for a few minutes. No purpose.',
+  'Sat on the couch for a moment, not doing anything specific.',
+  'Refilled his water bottle.',
+  'Opened and immediately closed four browser tabs.',
+  'Stood up, paced a few steps, sat back down.',
+  'Read some messages. Didn\'t reply to any of them.',
+  'Noticed the dishes in the sink. Decided to deal with them later.',
+  'Made a second coffee. Knew he shouldn\'t.',
+  'Stared at the Notion doc. Closed it.',
+  'Put on The Office. Watched one scene. Closed it.',
+  'Heard his upstairs neighbor. Chose not to think about it.',
+];
+
+function getMicroAction() {
+  return MICRO_ACTIONS[Math.floor(Math.random() * MICRO_ACTIONS.length)];
+}
+
 function buildCronExpression(minutes) {
   if (minutes >= 1) {
     return `*/${Math.round(minutes)} * * * *`;
@@ -120,6 +148,10 @@ async function runTick() {
     return;
   }
 
+  // Micro-action — the small human thing Walter does first
+  const microAction = getMicroAction();
+  logger.tick(`→ ${microAction}`);
+
   // Check for planted thought from god mode
   let plantedThought = null;
   try {
@@ -182,15 +214,39 @@ async function runTick() {
       decision.content = result.summary;
       decision.moodChange = result.moodImpact;
       decision.energyChange = result.energyImpact;
+
       if (result.metSomeone && result.person) {
         const p = result.person;
-        memoryManager.updateRelationship(p.name.toLowerCase(), {
-          name: p.name, handle: p.name.toLowerCase(),
-          notes: p.vibe, metAt: result.location, sentiment: 0.1,
+        const handle = p.name.toLowerCase().replace(/\s+/g, '_');
+
+        // Check how many times Walter has encountered this person before
+        const rels = memoryManager.loadRelationships();
+        const existing = rels.find(r => r.handle === handle);
+        const prevEncounters = existing ? (existing.encounter_count || 0) : 0;
+
+        // Record the encounter (increments encounter_count only, not interaction_count)
+        memoryManager.recordEncounter(handle, {
+          name: p.name,
+          notes: p.vibe,
+          metAt: result.location,
         });
-        messageStore.addMessage(p.name, 'narrator', `Met at ${result.location}. They said: "${p.said}"`);
-        logger.tick(`Walter met ${p.name} at ${result.location}`);
-        decision.content = `${result.summary} Met ${p.name} there — ${p.vibe}`;
+
+        if (prevEncounters === 0) {
+          // First time — just a face, no real exchange
+          logger.tick(`Walter noticed someone at ${result.location} (first encounter)`);
+          decision.content = `${result.summary} There was someone nearby — ${p.vibe} Didn't say anything. Just a face.`;
+        } else if (prevEncounters === 1) {
+          // Second encounter — names maybe exchanged
+          logger.tick(`Walter saw ${p.name} again at ${result.location} (names exchanged)`);
+          decision.content = `${result.summary} Same person was there again. ${p.said ? p.said + ' ' : ''}Finally exchanged names — they're ${p.name}.`;
+          messageStore.addMessage(p.name, 'narrator', `Second encounter at ${result.location}. Names exchanged.`);
+        } else {
+          // Third+ — actual conversation happens
+          logger.tick(`Walter talked to ${p.name} at ${result.location}`);
+          decision.content = `${result.summary} Saw ${p.name} again. ${p.said}`;
+          messageStore.addMessage(p.name, 'narrator', `At ${result.location}. ${p.said}`);
+          memoryManager.updateRelationship(handle, { sentiment: 0.1 });
+        }
       }
     } catch (err) {
       logger.error(`go_out failed: ${err.message}`);
@@ -203,13 +259,15 @@ async function runTick() {
   if (decision.action === 'text_someone') {
     try {
       const rels = memoryManager.loadRelationships();
-      if (rels.length === 0) {
+      // Only text people Walter has actually exchanged names with (encounter_count >= 2)
+      const textable = rels.filter(r => (r.encounter_count || 0) >= 2);
+      if (textable.length === 0) {
         decision.action = 'think';
-        decision.content = 'Wanted to text someone. Opened his phone. No one to text. Closed it.';
-        decision.innerThought = 'I should meet some people.';
-        decision.moodChange = -0.05;
+        decision.content = 'Wanted to text someone. Looked at his phone. There are people he\'s seen but doesn\'t actually know. Put it down.';
+        decision.innerThought = 'I need to actually talk to people when I go out.';
+        decision.moodChange = -0.03;
       } else {
-        const person = rels[Math.floor(Math.random() * rels.length)];
+        const person = textable[Math.floor(Math.random() * textable.length)];
         const name = person.name || person.handle;
         const recent = messageStore.getRecentMessages(name, 6);
         const result = await socialLife.textSomeone(person, state, recent);
@@ -324,6 +382,7 @@ async function runTick() {
       onTickCallback({
         state: memoryManager.loadState(),
         decision,
+        microAction,
         personality: memoryManager.loadPersonality(),
         anomalyCount: memoryManager.getAnomalyCount(),
         timestamp: new Date().toISOString(),

@@ -247,9 +247,41 @@ function updateRelationship(handle, update) {
       first_met: new Date().toISOString(),
       last_interaction: new Date().toISOString(),
       interaction_count: 1,
+      encounter_count: 0,
       sentiment: 0,
       notes: '',
       ...update,
+    });
+  }
+
+  atomicWrite(FILES.relationships, relationships);
+}
+
+// Records a physical encounter (seeing someone in person).
+// Increments encounter_count but NOT interaction_count.
+function recordEncounter(handle, update) {
+  ensureMemoryDir();
+  const relationships = loadRelationships();
+  const existing = relationships.find(r => r.handle === handle);
+
+  if (existing) {
+    existing.encounter_count = (existing.encounter_count || 0) + 1;
+    existing.last_encounter = new Date().toISOString();
+    // Only update descriptive fields, never overwrite tracking counters
+    const { interaction_count, encounter_count, ...safeUpdate } = update;
+    Object.assign(existing, safeUpdate);
+  } else {
+    const { interaction_count, encounter_count, ...safeUpdate } = update;
+    relationships.push({
+      handle,
+      first_met: new Date().toISOString(),
+      last_encounter: new Date().toISOString(),
+      last_interaction: new Date().toISOString(),
+      encounter_count: 1,
+      interaction_count: 0,
+      sentiment: 0,
+      notes: '',
+      ...safeUpdate,
     });
   }
 
@@ -428,6 +460,7 @@ module.exports = {
   // Relationships
   loadRelationships,
   updateRelationship,
+  recordEncounter,
   // Personality
   loadPersonality,
   savePersonality,

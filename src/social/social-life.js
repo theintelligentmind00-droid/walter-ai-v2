@@ -12,28 +12,30 @@ function get(raw, key) {
   return match ? match[1].trim() : '';
 }
 
-const GO_OUT_SYSTEM = `You are narrating a moment in Walter's life. Walter is 24, lives alone, just quit his job to start a company, anxious but funny in a dry way. He decided to get out of his apartment.
+const GO_OUT_SYSTEM = `You are narrating a moment in Walter's life. Walter is 24, lives alone in Austin TX, just quit his software job to start a company he hasn't figured out yet. He's a bit awkward in social situations but observant and dry.
 
-Based on his mood and the time of day, narrate what happens. Use EXACTLY this format — no other text:
+Walter decided to get out of his apartment.
 
-LOCATION: [specific named place — e.g. "a coffee shop called Blue Bottle on 3rd", "a coworking space downtown", "a bar called The Rail two blocks away", "the roof of his building"]
-MET_SOMEONE: [yes or no — roughly 65% chance of yes — he's a 24 year old going to coffee shops and bars, he talks to people]
-SUMMARY: [2-3 sentences from Walter's first-person perspective: where he went, what he did, how it felt]
+Based on his mood and time of day, narrate what happens. Use EXACTLY this format — no other text:
+
+LOCATION: [specific named place — e.g. "Figure 8 Coffee on 5th", "the Barton Springs pool area", "a bar called The White Horse on 6th", "the coworking space on Red River"]
+MET_SOMEONE: [yes or no — 30% chance of yes. Most of the time he doesn't talk to anyone.]
+SUMMARY: [2-3 sentences in Walter's first-person voice: where he went, what he did, how it actually felt. Be honest — not every outing is good. Sometimes it's just okay. Use his dry voice.]
 MOOD_IMPACT: [number from -0.15 to 0.15]
 ENERGY_IMPACT: [number from -0.1 to 0.1]
 
-If MET_SOMEONE is yes, also output these four lines:
-PERSON_NAME: [a realistic first name — Marcus, Lily, Jake, Priya, Sam, Zoe, Devon, Nadia, Omar, Claire]
-PERSON_VIBE: [one sentence describing who they are and their personality]
-PERSON_SAID: [the first thing they actually said to Walter — natural, not cheesy]`;
+If MET_SOMEONE is yes, also output:
+PERSON_NAME: [a realistic first name — Marcus, Lily, Jake, Priya, Sam, Zoe, Devon, Nadia, Omar, Claire, Raj, Sofia]
+PERSON_VIBE: [one sentence — just a surface impression of who they seem to be. Walter doesn't know them yet.]
+PERSON_SAID: [the brief, realistic exchange — maybe just a nod, asking if a seat is taken, a comment about the wifi being slow. Keep it short and slightly awkward. NOT an immediate connection. First meetings are usually nothing special.]`;
 
-const TEXT_SYSTEM = `You are generating a text message exchange for Walter (24, building a startup, dry humor, tends to be a little awkward over text). Walter is texting someone he knows.
+const TEXT_SYSTEM = `You are generating a text exchange for Walter Kaminsky (24, Austin TX, building a startup, dry humor, tends to be a little awkward over text and overthinks his messages).
 
 Use EXACTLY this format — no other text:
 
-WALTER_SAYS: [Walter's text message — casual, real, max 2 sentences, slightly awkward or funny]
-THEIR_RESPONSE: [how the other person responds, based on their personality]
-MOOD_IMPACT: [number from -0.1 to 0.1 — positive if it went well]`;
+WALTER_SAYS: [Walter's text — casual, real, slightly overthought or dorky, max 2 sentences. He sometimes makes dry jokes. He doesn't use slang ironically.]
+THEIR_RESPONSE: [how the other person responds, based on their personality and how well they know Walter]
+MOOD_IMPACT: [number from -0.1 to 0.1 — positive if it went okay]`;
 
 async function goOut(state) {
   const timeOfDay = state.hour < 12 ? 'morning' : state.hour < 17 ? 'afternoon' : state.hour < 21 ? 'evening' : 'late night';
