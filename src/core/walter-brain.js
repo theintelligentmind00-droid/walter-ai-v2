@@ -18,7 +18,7 @@ IMPORTANT: You MUST pick a different action than your last one. You never do the
 You will be given your current state and recent memories. Based on all of this, decide what to do next
 and respond in EXACTLY this format — no other text, no explanation:
 
-ACTION: [one of: think, journal, work_startup, sleep, post_x, read_x, reply_x]
+ACTION: [one of: think, journal, work_startup, sleep, post_x, read_x, reply_x, go_out, text_someone]
 CONTENT: [what you actually think/write/do — be specific, be real, 2-4 sentences]
 MOOD_CHANGE: [number between -0.2 and 0.2 — working on your startup, posting something good, or journaling can genuinely lift your mood; not everything has to drag you down]
 ENERGY_CHANGE: [number between -0.2 and 0.2]
@@ -52,15 +52,26 @@ function buildUserMessage(state, memories, socialContext, lastAction, longTermMe
     longTermSection = `\nThings you remember from before:\n${summaries}\n`;
   }
 
-  // Relationships
+  // Relationships + text availability
   let relationshipsSection = '';
+  let textAction = '- text_someone (you don\'t know anyone yet — go_out first)';
   if (relationships && relationships.length > 0) {
-    const active = relationships
-      .sort((a, b) => b.interaction_count - a.interaction_count)
-      .slice(0, 3)
-      .map(r => `• @${r.handle} (${r.interaction_count} interactions, sentiment: ${r.sentiment > 0 ? 'positive' : r.sentiment < 0 ? 'negative' : 'neutral'})`)
-      .join('\n');
-    relationshipsSection = `\nPeople you know:\n${active}\n`;
+    const sorted = relationships.sort((a, b) => b.interaction_count - a.interaction_count);
+    const names = sorted.map(r => r.name || r.handle).join(', ');
+    textAction = `- text_someone (can text: ${names})`;
+    const summaries = sorted.slice(0, 3).map(r => {
+      const name = r.name || r.handle;
+      const where = r.metAt ? `met at ${r.metAt}` : 'met somewhere';
+      const feel = (r.sentiment || 0) > 0.1 ? 'you like them' : (r.sentiment || 0) < -0.1 ? 'complicated' : 'neutral';
+      return `• ${name} — ${where}, ${r.interaction_count} interactions, ${feel}`;
+    }).join('\n');
+    relationshipsSection = `\nPeople you know:\n${summaries}\n`;
+  }
+
+  // Social nudge if lonely
+  let socialNudge = '';
+  if (personality && personality.socialNeed > 0.65 && state.mood < 0) {
+    socialNudge = '\nYou\'ve been alone too long and you feel it. Seriously consider going out or texting someone.\n';
   }
 
   // Personality traits as context
@@ -78,11 +89,13 @@ function buildUserMessage(state, memories, socialContext, lastAction, longTermMe
 - Mood: ${moodLabel} (${state.mood.toFixed(2)})
 - Energy: ${energyLabel} (${state.energy.toFixed(2)})
 - Day: ${state.day}
-${lastActionLine}${personalitySection}${longTermSection}Recent memories:
+${lastActionLine}${personalitySection}${socialNudge}${longTermSection}Recent memories:
 ${memorySummary}
 ${socialSection}${relationshipsSection}
 Available actions:
 - think, journal, work_startup, sleep
+- go_out (leave the apartment — coffee shop, bar, coworking space, might meet someone)
+${textAction}
 ${xAvailable}
 
 What do you do next?`;

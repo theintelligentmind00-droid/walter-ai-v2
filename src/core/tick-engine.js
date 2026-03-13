@@ -7,6 +7,8 @@ const memoryManager = require('../memory/memory-manager');
 const xClient = require('../social/x-client');
 const postComposer = require('../social/post-composer');
 const feedReader = require('../social/feed-reader');
+const socialLife = require('../social/social-life');
+const messageStore = require('../social/message-store');
 
 let onTickCallback = null; // Set by index.js to wire dashboard updates
 
@@ -172,6 +174,60 @@ async function runTick() {
   }
 
   logger.tick(`Action: ${decision.action}`);
+
+  // Handle go_out
+  if (decision.action === 'go_out') {
+    try {
+      const result = await socialLife.goOut(state);
+      decision.content = result.summary;
+      decision.moodChange = result.moodImpact;
+      decision.energyChange = result.energyImpact;
+      if (result.metSomeone && result.person) {
+        const p = result.person;
+        memoryManager.updateRelationship(p.name.toLowerCase(), {
+          name: p.name, handle: p.name.toLowerCase(),
+          notes: p.vibe, metAt: result.location, sentiment: 0.1,
+        });
+        messageStore.addMessage(p.name, 'narrator', `Met at ${result.location}. They said: "${p.said}"`);
+        logger.tick(`Walter met ${p.name} at ${result.location}`);
+        decision.content = `${result.summary} Met ${p.name} there — ${p.vibe}`;
+      }
+    } catch (err) {
+      logger.error(`go_out failed: ${err.message}`);
+      decision.action = 'think';
+      decision.content = 'Thought about going out but didn\'t.';
+    }
+  }
+
+  // Handle text_someone
+  if (decision.action === 'text_someone') {
+    try {
+      const rels = memoryManager.loadRelationships();
+      if (rels.length === 0) {
+        decision.action = 'think';
+        decision.content = 'Wanted to text someone. Opened his phone. No one to text. Closed it.';
+        decision.innerThought = 'I should meet some people.';
+        decision.moodChange = -0.05;
+      } else {
+        const person = rels[Math.floor(Math.random() * rels.length)];
+        const name = person.name || person.handle;
+        const recent = messageStore.getRecentMessages(name, 6);
+        const result = await socialLife.textSomeone(person, state, recent);
+        messageStore.addMessage(name, 'walter', result.walterMessage);
+        messageStore.addMessage(name, name, result.response);
+        memoryManager.updateRelationship(person.handle || name.toLowerCase(), {
+          sentiment: clamp((person.sentiment || 0) + result.moodImpact * 0.5, -1, 1),
+        });
+        decision.content = `Texted ${name}: "${result.walterMessage}" They said: "${result.response}"`;
+        decision.moodChange = result.moodImpact;
+        logger.tick(`Walter texted ${name}`);
+      }
+    } catch (err) {
+      logger.error(`text_someone failed: ${err.message}`);
+      decision.action = 'think';
+      decision.content = 'Tried to text someone. Something went wrong.';
+    }
+  }
 
   // Handle journal action — write to journal file
   if (decision.action === 'journal') {

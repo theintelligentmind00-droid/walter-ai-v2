@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const memoryManager = require('../memory/memory-manager');
+const messageStore = require('../social/message-store');
 
 const app = express();
 const server = http.createServer(app);
@@ -36,7 +37,7 @@ function isAuthenticated(req) {
 function requireAuth(req, res, next) {
   if (isAuthenticated(req)) return next();
   if (req.path === '/login') return next();
-  if (req.path.startsWith('/god/') || req.path.startsWith('/state') || req.path.startsWith('/memory') || req.path.startsWith('/journal') || req.path.startsWith('/personality')) {
+  if (req.path.startsWith('/god/') || req.path.startsWith('/state') || req.path.startsWith('/memory') || req.path.startsWith('/journal') || req.path.startsWith('/personality') || req.path.startsWith('/messages')) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   res.redirect('/login');
@@ -144,6 +145,14 @@ app.get('/journal', (req, res) => {
 app.get('/personality', (req, res) => {
   try {
     res.json(memoryManager.loadPersonality());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/messages', (req, res) => {
+  try {
+    res.json(messageStore.getAllThreads());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -101,6 +101,21 @@
   .tick-card.action-post_x       { border-left-color: #aa88ff; }
   .tick-card.action-read_x       { border-left-color: #44ccff; }
   .tick-card.action-reply_x      { border-left-color: #ff88aa; }
+  .tick-card.action-go_out       { border-left-color: #88ffcc; }
+  .tick-card.action-text_someone { border-left-color: #ffcc44; }
+
+  /* Messages */
+  .msg-thread { margin-bottom: 12px; }
+  .msg-thread-name { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+  .msg-bubble { display: flex; margin-bottom: 4px; }
+  .msg-bubble.walter { justify-content: flex-end; }
+  .msg-bubble.them { justify-content: flex-start; }
+  .msg-bubble.narrator { justify-content: center; }
+  .msg-text { max-width: 75%; padding: 5px 9px; font-size: 12px; line-height: 1.4; border-radius: 2px; }
+  .msg-bubble.walter .msg-text { background: #1a2a1a; border: 1px solid var(--green); color: var(--text); }
+  .msg-bubble.them .msg-text { background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+  .msg-bubble.narrator .msg-text { background: transparent; color: var(--muted); font-style: italic; font-size: 11px; border: none; }
+  .msg-ts { font-size: 9px; color: var(--muted); margin-top: 2px; text-align: right; }
 
   .tick-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
   .action-badge {
@@ -311,6 +326,7 @@
       <div class="mem-tab" onclick="switchTab('relationships', this)">Relationships</div>
       <div class="mem-tab" onclick="switchTab('personality', this)">Personality</div>
       <div class="mem-tab" onclick="switchTab('anomalies', this)">Anomalies</div>
+      <div class="mem-tab" onclick="switchTab('messages', this)">Messages</div>
     </div>
     <div class="mem-content" id="memContent">
       <div class="mem-empty">Connecting to Walter...</div>
@@ -457,22 +473,34 @@ function switchTab(tab, el) {
 
 async function refreshMemTab(tab) {
   const content = document.getElementById('memContent');
-
   try {
-    let data;
     if (tab === 'journal') {
-      data = await apiFetch('/journal');
-      renderJournal(data, content);
+      renderJournal(await apiFetch('/journal'), content);
     } else if (tab === 'personality') {
-      data = await apiFetch('/personality');
-      renderPersonality(data, content);
+      renderPersonality(await apiFetch('/personality'), content);
+    } else if (tab === 'messages') {
+      renderMessages(await apiFetch('/messages'), content);
     } else {
-      data = await apiFetch('/memory/' + tab);
-      renderMemoryList(data, tab, content);
+      renderMemoryList(await apiFetch('/memory/' + tab), tab, content);
     }
   } catch (err) {
     content.innerHTML = `<div class="mem-empty">Error loading: ${err.message}</div>`;
   }
+}
+
+function renderMessages(threads, container) {
+  if (!threads || Object.keys(threads).length === 0) {
+    container.innerHTML = '<div class="mem-empty">No messages yet. Walter needs to go out and meet people.</div>';
+    return;
+  }
+  container.innerHTML = Object.entries(threads).map(([slug, msgs]) => {
+    const name = slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const bubbles = msgs.map(m => {
+      const who = m.from === 'walter' ? 'walter' : m.from === 'narrator' ? 'narrator' : 'them';
+      return `<div class="msg-bubble ${who}"><div class="msg-text">${esc(m.message)}</div></div>`;
+    }).join('');
+    return `<div class="msg-thread"><div class="msg-thread-name">${esc(name)}</div>${bubbles}</div>`;
+  }).join('');
 }
 
 function renderMemoryList(entries, tab, container) {
